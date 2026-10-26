@@ -19,3 +19,4 @@ A web-based system for managing electronic component inventory.
 - Django
 - JavaScript
 - SQL Database
+- Jira integration test for ESMSCN-9
