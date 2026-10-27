@@ -84,7 +84,9 @@ def test_delete_component(client):
     conn.close()
 
     assert remaining == 0
-    def test_stock_status_counts():
+
+
+def test_stock_status_counts():
     quantities = [15, 20, 5, 10, 0, 0]
 
     available = sum(
