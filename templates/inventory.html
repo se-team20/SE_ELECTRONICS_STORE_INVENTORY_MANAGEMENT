@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inventory | Electronics Inventory</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #f4f6f9; color: #222; }
+        header { background: #172554; color: white; padding: 20px 30px; }
+        nav a { color: white; margin-right: 18px; text-decoration: none; }
+        main { padding: 30px; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background: #e8edf5; }
+        button, .link-button { padding: 7px 12px; cursor: pointer; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Electronics Store Inventory</h1>
+    <nav>
+        <a href="/">Dashboard</a><a href="/inventory">Inventory</a>
+        <a href="/add">Add Component</a><a href="/report">Reports</a>
+        <form action="/logout" method="post" style="display:inline">
+            <button type="submit">Logout</button>
+        </form>
+    </nav>
+</header>
+<main>
+    <h2>Inventory</h2>
+    <p><a href="/add">+ Add Component</a></p>
+    {% if components %}
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Name</th><th>Category</th><th>Quantity</th><th>Price</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+        {% for c in components %}
+            <tr>
+                <td>{{ c.component_id }}</td>
+                <td>{{ c.component_name }}</td>
+                <td>{{ c.category }}</td>
+                <td>{{ c.quantity }}</td>
+                <td>₹{{ "%.2f"|format(c.price) }}</td>
+                <td>{{ get_status(c.quantity) }}</td>
+                <td>
+                    <form action="/delete/{{ c.component_id }}" method="post"
+                          onsubmit="return confirm('Delete this component?');">
+                        <button type="submit">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>No components found. Add your first component to get started.</p>
+    {% endif %}
+</main>
+</body>
+</html>
