@@ -7,37 +7,43 @@
 <h2>Component Inventory</h2>
 
 <div class="card">
-    <a href="{{ url_for('add_component') }}">
-        <button type="button">+ Add Component</button>
-    </a>
+    <p>
+        <a href="{{ url_for('add_component') }}">+ Add Component</a>
+    </p>
 
-    <div style="display:flex; flex-wrap:wrap; gap:12px; margin:16px 0;">
-        <input
-            type="search"
-            id="searchInput"
-            placeholder="Search component name..."
-            aria-label="Search components"
-        >
+    <form action="{{ url_for('inventory') }}" method="GET"
+          style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
 
-        <select id="categoryFilter" aria-label="Filter by category">
+        <input type="search" name="search"
+               placeholder="Search component name..."
+               value="{{ search }}" aria-label="Search components">
+
+        <select name="category" aria-label="Filter by category">
             <option value="">All Categories</option>
-            {% for component in components %}
-                <option value="{{ component['category'] }}">
-                    {{ component['category'] }}
+            {% for item in categories %}
+                <option value="{{ item }}"
+                    {% if selected_category == item %}selected{% endif %}>
+                    {{ item }}
                 </option>
             {% endfor %}
         </select>
 
-        <select id="statusFilter" aria-label="Filter by stock status">
+        <select name="status" aria-label="Filter by stock status">
             <option value="">All Stock Statuses</option>
-            <option value="Available">Available</option>
-            <option value="Low Stock">Low Stock</option>
-            <option value="Out of Stock">Out of Stock</option>
+            {% for item in ['Available', 'Low Stock', 'Out of Stock'] %}
+                <option value="{{ item }}"
+                    {% if selected_status == item %}selected{% endif %}>
+                    {{ item }}
+                </option>
+            {% endfor %}
         </select>
-    </div>
 
-    <div style="overflow-x:auto;">
-        <table id="inventoryTable">
+        <button type="submit">Apply Filters</button>
+        <a href="{{ url_for('inventory') }}">Clear Filters</a>
+    </form>
+
+    <div style="overflow-x:auto; margin-top:20px;">
+        <table>
             <thead>
                 <tr>
                     <th>ID</th>
@@ -51,11 +57,7 @@
             </thead>
             <tbody>
                 {% for component in components %}
-                <tr
-                    data-name="{{ component['component_name']|lower }}"
-                    data-category="{{ component['category'] }}"
-                    data-status="{{ get_status(component['quantity']) }}"
-                >
+                <tr>
                     <td>{{ component['component_id'] }}</td>
                     <td>{{ component['component_name'] }}</td>
                     <td>{{ component['category'] }}</td>
@@ -63,74 +65,25 @@
                     <td>{{ "%.2f"|format(component['price']) }}</td>
                     <td>{{ get_status(component['quantity']) }}</td>
                     <td>
-                        <form
-                            action="{{ url_for('delete_component', component_id=component['component_id']) }}"
-                            method="GET"
-                            onsubmit="return confirm('Are you sure you want to delete this component?');"
-                        >
+                        <a href="{{ url_for('edit_component', component_id=component['component_id']) }}">
+                            Edit
+                        </a>
+
+                        <form action="{{ url_for('delete_component', component_id=component['component_id']) }}"
+                              method="POST"
+                              onsubmit="return confirm('Are you sure you want to delete this component?');"
+                              style="display:inline;">
                             <button type="submit">Delete</button>
                         </form>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7">No components found. Add your first component to get started.</td>
+                    <td colspan="7">No components match your filters.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-
-    <p id="noResults" hidden>No components match your search or filters.</p>
 </div>
-
-<script>
-    const searchInput = document.getElementById("searchInput");
-    const categoryFilter = document.getElementById("categoryFilter");
-    const statusFilter = document.getElementById("statusFilter");
-    const rows = document.querySelectorAll("#inventoryTable tbody tr[data-name]");
-    const noResults = document.getElementById("noResults");
-
-    // Remove duplicate categories from the dropdown.
-    const categoryOptions = Array.from(categoryFilter.options);
-    const seenCategories = new Set();
-
-    categoryOptions.forEach(option => {
-        if (!option.value) return;
-
-        if (seenCategories.has(option.value)) {
-            option.remove();
-        } else {
-            seenCategories.add(option.value);
-        }
-    });
-
-    function filterInventory() {
-        const search = searchInput.value.trim().toLowerCase();
-        const category = categoryFilter.value;
-        const status = statusFilter.value;
-        let visibleCount = 0;
-
-        rows.forEach(row => {
-            const matchesSearch = row.dataset.name.includes(search);
-            const matchesCategory =
-                !category || row.dataset.category === category;
-            const matchesStatus =
-                !status || row.dataset.status === status;
-
-            const visible =
-                matchesSearch && matchesCategory && matchesStatus;
-
-            row.hidden = !visible;
-
-            if (visible) visibleCount++;
-        });
-
-        noResults.hidden = visibleCount > 0;
-    }
-
-    searchInput.addEventListener("input", filterInventory);
-    categoryFilter.addEventListener("change", filterInventory);
-    statusFilter.addEventListener("change", filterInventory);
-</script>
 {% endblock %}
