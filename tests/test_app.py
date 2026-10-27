@@ -185,3 +185,41 @@ def test_report_categorizes_components(client):
     assert statuses.count("Available") == 1
     assert statuses.count("Low Stock") == 1
     assert statuses.count("Out of Stock") == 1
+
+
+def test_add_component_rejects_invalid_quantity(client):
+    response = add_component(
+        client,
+        name="Invalid Keyboard",
+        quantity="abc",
+        price=799.0
+    )
+
+    assert response.status_code == 400
+
+    conn = sqlite3.connect(inventory_app.DATABASE)
+    count = conn.execute(
+        "SELECT COUNT(*) FROM components"
+    ).fetchone()[0]
+    conn.close()
+
+    assert count == 0
+
+
+def test_add_component_rejects_invalid_price(client):
+    response = add_component(
+        client,
+        name="Invalid Mouse",
+        quantity=5,
+        price="invalid"
+    )
+
+    assert response.status_code == 400
+
+    conn = sqlite3.connect(inventory_app.DATABASE)
+    count = conn.execute(
+        "SELECT COUNT(*) FROM components"
+    ).fetchone()[0]
+    conn.close()
+
+    assert count == 0
