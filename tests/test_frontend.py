@@ -29,11 +29,11 @@ class FrontendIntegrationTests(unittest.TestCase):
         conn = inventory_app.get_db_connection()
         cursor = conn.execute(
             """
-            INSERT INTO components
-                (component_name, category, quantity, price)
-            VALUES (?, ?, ?, ?)
+           INSERT INTO components
+           (sku, component_name, category, quantity, price)
+           VALUES (?, ?, ?, ?, ?)
             """,
-            (name, category, quantity, price),
+            (f"TEST-{name.replace(' ', '-')}", name, category, quantity, price)
         )
         conn.commit()
         component_id = cursor.lastrowid
@@ -62,6 +62,7 @@ class FrontendIntegrationTests(unittest.TestCase):
 
     def test_valid_submission_adds_component(self):
         response = self.client.post("/add", data={
+            "sku": "TEST-ARDUINO",
             "component_name": "Arduino",
             "category": "Boards",
             "quantity": "15",
@@ -122,6 +123,7 @@ class FrontendIntegrationTests(unittest.TestCase):
         response = self.client.post(
             f"/edit/{component_id}",
             data={
+                "sku": "TEST-ARDUINO-UPDATED",
                 "component_name": "Updated Arduino",
                 "category": "Boards",
                 "quantity": "20",
