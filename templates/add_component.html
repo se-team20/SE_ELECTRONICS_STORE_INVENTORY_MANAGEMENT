@@ -1,49 +1,44 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Add Component | Electronics Inventory</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; background: #f4f6f9; color: #222; }
-        header { background: #172554; color: white; padding: 20px 30px; }
-        nav a { color: white; margin-right: 18px; text-decoration: none; }
-        main { padding: 30px; }
-        form.entry { background: white; padding: 24px; border-radius: 10px; max-width: 450px; }
-        label { display: block; margin-top: 15px; }
-        input { box-sizing: border-box; width: 100%; padding: 10px; margin-top: 6px; }
-        button { margin-top: 20px; padding: 10px 16px; cursor: pointer; }
-    </style>
-</head>
-<body>
-<header>
-    <h1>Electronics Store Inventory</h1>
-    <nav>
-        <a href="/">Dashboard</a><a href="/inventory">Inventory</a>
-        <a href="/add">Add Component</a><a href="/report">Reports</a>
-        <form action="/logout" method="post" style="display:inline">
-            <button type="submit">Logout</button>
-        </form>
-    </nav>
-</header>
-<main>
-    <h2>Add Component</h2>
-    <form class="entry" method="post" action="/add">
-        <label for="component_name">Component Name</label>
-        <input id="component_name" name="component_name" required maxlength="150">
 
-        <label for="category">Category</label>
-        <input id="category" name="category" required maxlength="100">
+{% extends "base.html" %}
 
-        <label for="quantity">Quantity</label>
-        <input id="quantity" name="quantity" type="number" min="0" required>
+{% block title %}Add Component | Inventory{% endblock %}
 
-        <label for="price">Price (₹)</label>
-        <input id="price" name="price" type="number" min="0" step="0.01" required>
+{% block content %}
+<h2>Add a Component</h2>
 
+<div class="card" style="max-width:650px;">
+    <form action="{{ url_for('add_component') }}" method="POST">
+        <div>
+            <label for="component_name">Component Name *</label><br>
+            <input type="text" id="component_name" name="component_name"
+                   value="{{ request.form.get('component_name', '') }}"
+                   maxlength="150" required style="width:100%;">
+        </div>
+
+        <div>
+            <label for="category">Category *</label><br>
+            <input type="text" id="category" name="category"
+                   value="{{ request.form.get('category', '') }}"
+                   maxlength="100" required style="width:100%;">
+        </div>
+
+        <div>
+            <label for="quantity">Quantity *</label><br>
+            <input type="number" id="quantity" name="quantity"
+                   value="{{ request.form.get('quantity', '') }}"
+                   min="0" step="1" required style="width:100%;">
+        </div>
+
+        <div>
+            <label for="price">Price per Unit *</label><br>
+            <input type="number" id="price" name="price"
+                   value="{{ request.form.get('price', '') }}"
+                   min="0" step="0.01" required style="width:100%;">
+        </div>
+
+        <p>* Required fields</p>
         <button type="submit">Save Component</button>
-        <a href="/inventory">Cancel</a>
+        <a href="{{ url_for('inventory') }}">Cancel</a>
     </form>
-</main>
-</body>
-</html>
+</div>
+{% endblock %}

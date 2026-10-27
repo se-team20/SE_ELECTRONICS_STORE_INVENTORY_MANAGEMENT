@@ -1,43 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Dashboard | Electronics Inventory</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; background: #f4f6f9; color: #222; }
-        header { background: #172554; color: white; padding: 20px 30px; }
-        nav a { color: white; margin-right: 18px; text-decoration: none; }
-        main { padding: 30px; }
-        .cards { display: flex; flex-wrap: wrap; gap: 18px; }
-        .card { background: white; padding: 24px; border-radius: 10px; flex: 1; min-width: 150px; box-shadow: 0 2px 8px #ddd; }
-        .number { font-size: 30px; font-weight: bold; }
-        button { padding: 9px 14px; cursor: pointer; }
-    </style>
-</head>
-<body>
-<header>
-    <h1>Electronics Store Inventory</h1>
-    <nav>
-        <a href="/">Dashboard</a>
-        <a href="/inventory">Inventory</a>
-        <a href="/add">Add Component</a>
-        <a href="/report">Reports</a>
-        <form action="/logout" method="post" style="display:inline">
-            <button type="submit">Logout</button>
-        </form>
-    </nav>
-</header>
-<main>
-    <h2>Dashboard</h2>
-    <p>Welcome, {{ session.get('username', 'User') }}!</p>
-    <div class="cards">
-        <div class="card"><h3>Total Components</h3><div class="number">{{ total }}</div></div>
-        <div class="card"><h3>Available</h3><div class="number">{{ available }}</div></div>
-        <div class="card"><h3>Low Stock</h3><div class="number">{{ low_stock }}</div></div>
-        <div class="card"><h3>Out of Stock</h3><div class="number">{{ out_of_stock }}</div></div>
+
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Electronics Inventory{% endblock %}
+
+{% block content %}
+<h2>Inventory Dashboard</h2>
+<p>Overview of your electronics components and current stock levels.</p>
+
+<div class="dashboard-cards" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px;">
+    <div class="card">
+        <h3>Total Components</h3>
+        <p style="font-size:2rem;">{{ total }}</p>
     </div>
-    <p style="margin-top:25px"><a href="/inventory">View inventory</a> | <a href="/add">Add a component</a></p>
-</main>
-</body>
-</html>
+
+    <div class="card">
+        <h3>Available</h3>
+        <p style="font-size:2rem;">{{ available }}</p>
+    </div>
+
+    <div class="card">
+        <h3>Low Stock</h3>
+        <p style="font-size:2rem;">{{ low_stock }}</p>
+    </div>
+
+    <div class="card">
+        <h3>Out of Stock</h3>
+        <p style="font-size:2rem;">{{ out_of_stock }}</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Quick Actions</h3>
+    <p><a href="{{ url_for('inventory') }}">View Inventory</a></p>
+    <p><a href="{{ url_for('add_component') }}">Add a Component</a></p>
+    <p><a href="{{ url_for('report') }}">View Availability Report</a></p>
+</div>
+{% endblock %}
