@@ -1,0 +1,38 @@
+
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Electronics Inventory{% endblock %}
+
+{% block content %}
+<h2>Inventory Dashboard</h2>
+<p>Overview of your electronics components and current stock levels.</p>
+
+<div class="dashboard-cards" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px;">
+    <div class="card">
+        <h3>Total Components</h3>
+        <p style="font-size:2rem;">{{ total }}</p>
+    </div>
+
+    <div class="card">
+        <h3>Available</h3>
+        <p style="font-size:2rem;">{{ available }}</p>
+    </div>
+
+    <div class="card">
+        <h3>Low Stock</h3>
+        <p style="font-size:2rem;">{{ low_stock }}</p>
+    </div>
+
+    <div class="card">
+        <h3>Out of Stock</h3>
+        <p style="font-size:2rem;">{{ out_of_stock }}</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Quick Actions</h3>
+    <p><a href="{{ url_for('inventory') }}">View Inventory</a></p>
+    <p><a href="{{ url_for('add_component') }}">Add a Component</a></p>
+    <p><a href="{{ url_for('report') }}">View Availability Report</a></p>
+</div>
+{% endblock %}
