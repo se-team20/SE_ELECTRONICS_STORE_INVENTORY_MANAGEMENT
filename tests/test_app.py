@@ -107,3 +107,81 @@ def test_stock_status_counts():
     assert low_stock == 2
     assert out_of_stock == 2
 
+
+def test_dashboard_calculations(client):
+    conn = sqlite3.connect(inventory_app.DATABASE)
+    conn.executemany(
+        """
+        INSERT INTO components
+        (component_name, category, quantity, price)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            ("Keyboard", "Accessories", 15, 799.0),
+            ("Mouse", "Accessories", 5, 299.0),
+            ("Monitor", "Displays", 0, 8999.0),
+            ("Cable", "Accessories", 10, 199.0),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    conn = sqlite3.connect(inventory_app.DATABASE)
+    components = conn.execute(
+        "SELECT quantity FROM components"
+    ).fetchall()
+    conn.close()
+
+    quantities = [row[0] for row in components]
+
+    total = len(quantities)
+    available = sum(
+        1 for q in quantities
+        if inventory_app.get_status(q) == "Available"
+    )
+    low_stock = sum(
+        1 for q in quantities
+        if inventory_app.get_status(q) == "Low Stock"
+    )
+    out_of_stock = sum(
+        1 for q in quantities
+        if inventory_app.get_status(q) == "Out of Stock"
+    )
+
+    assert total == 4
+    assert available == 1
+    assert low_stock == 2
+    assert out_of_stock == 1
+
+
+def test_report_categorizes_components(client):
+    conn = sqlite3.connect(inventory_app.DATABASE)
+    conn.executemany(
+        """
+        INSERT INTO components
+        (component_name, category, quantity, price)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            ("Keyboard", "Accessories", 15, 799.0),
+            ("Mouse", "Accessories", 5, 299.0),
+            ("Monitor", "Displays", 0, 8999.0),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    conn = sqlite3.connect(inventory_app.DATABASE)
+    quantities = conn.execute(
+        "SELECT quantity FROM components"
+    ).fetchall()
+    conn.close()
+
+    statuses = [
+        inventory_app.get_status(row[0])
+        for row in quantities
+    ]
+
+    assert statuses.count("Available") == 1
+    assert statuses.count("Low Stock") == 1
+    assert statuses.count("Out of Stock") == 1
