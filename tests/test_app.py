@@ -84,3 +84,22 @@ def test_delete_component(client):
     conn.close()
 
     assert remaining == 0
+    def test_stock_status_counts():
+    quantities = [15, 20, 5, 10, 0, 0]
+
+    available = sum(
+        1 for q in quantities
+        if inventory_app.get_status(q) == "Available"
+    )
+    low_stock = sum(
+        1 for q in quantities
+        if inventory_app.get_status(q) == "Low Stock"
+    )
+    out_of_stock = sum(
+        1 for q in quantities
+        if inventory_app.get_status(q) == "Out of Stock"
+    )
+
+    assert available == 2
+    assert low_stock == 2
+    assert out_of_stock == 2
