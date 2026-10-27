@@ -1,0 +1,89 @@
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f6f9;
+    color: #222;
+}
+
+header {
+    background: #172554;
+    color: white;
+    padding: 20px 32px;
+}
+
+header h1 {
+    margin: 0 0 16px;
+}
+
+nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+}
+
+nav a:hover {
+    text-decoration: underline;
+}
+
+main {
+    max-width: 1200px;
+    margin: 28px auto;
+    padding: 0 24px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+th, td {
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+}
+
+th {
+    background: #e8edf5;
+}
+
+input, select, textarea, button {
+    padding: 10px;
+    margin: 6px 0;
+    font: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+.message {
+    padding: 12px;
+    background: #e8edf5;
+    border-radius: 4px;
+}
+
+.error {
+    color: #991b1b;
+}
+
+.success {
+    color: #166534;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px #00000012;
+}
