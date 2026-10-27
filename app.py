@@ -1,4 +1,3 @@
-```python
 from flask import Flask, render_template, request, redirect
 import sqlite3
 
@@ -42,9 +41,7 @@ def get_status(quantity):
 @app.route("/")
 def dashboard():
     conn = get_db_connection()
-    components = conn.execute(
-        "SELECT * FROM components"
-    ).fetchall()
+    components = conn.execute("SELECT * FROM components").fetchall()
     conn.close()
 
     total = len(components)
@@ -73,9 +70,7 @@ def dashboard():
 @app.route("/inventory")
 def inventory():
     conn = get_db_connection()
-    components = conn.execute(
-        "SELECT * FROM components"
-    ).fetchall()
+    components = conn.execute("SELECT * FROM components").fetchall()
     conn.close()
 
     return render_template(
@@ -88,12 +83,8 @@ def inventory():
 @app.route("/add", methods=["GET", "POST"])
 def add_component():
     if request.method == "POST":
-        component_name = request.form.get(
-            "component_name", ""
-        ).strip()
-        category = request.form.get(
-            "category", ""
-        ).strip()
+        component_name = request.form.get("component_name", "").strip()
+        category = request.form.get("category", "").strip()
 
         try:
             quantity = int(request.form.get("quantity", ""))
@@ -150,9 +141,7 @@ def delete_component(component_id):
 @app.route("/report")
 def report():
     conn = get_db_connection()
-    components = conn.execute(
-        "SELECT * FROM components"
-    ).fetchall()
+    components = conn.execute("SELECT * FROM components").fetchall()
     conn.close()
 
     available = []
@@ -187,4 +176,3 @@ if __name__ == "__main__":
     print("Open: http://127.0.0.1:5000")
 
     app.run(debug=True)
-```
