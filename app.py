@@ -40,27 +40,19 @@ def get_status(quantity):
 
 @app.route("/")
 def dashboard():
-
     conn = get_db_connection()
-
-    components = conn.execute(
-        "SELECT * FROM components"
-    ).fetchall()
-
+    components = conn.execute("SELECT * FROM components").fetchall()
     conn.close()
 
     total = len(components)
-
     available = sum(
         1 for c in components
         if get_status(c["quantity"]) == "Available"
     )
-
     low_stock = sum(
         1 for c in components
         if get_status(c["quantity"]) == "Low Stock"
     )
-
     out_of_stock = sum(
         1 for c in components
         if get_status(c["quantity"]) == "Out of Stock"
@@ -77,13 +69,8 @@ def dashboard():
 
 @app.route("/inventory")
 def inventory():
-
     conn = get_db_connection()
-
-    components = conn.execute(
-        "SELECT * FROM components"
-    ).fetchall()
-
+    components = conn.execute("SELECT * FROM components").fetchall()
     conn.close()
 
     return render_template(
@@ -95,29 +82,41 @@ def inventory():
 
 @app.route("/add", methods=["GET", "POST"])
 def add_component():
-
     if request.method == "POST":
+        component_name = request.form.get("component_name", "").strip()
+        category = request.form.get("category", "").strip()
 
-        component_name = request.form["component_name"]
-        category = request.form["category"]
-        quantity = int(request.form["quantity"])
-        price = float(request.form["price"])
+        try:
+            quantity = int(request.form.get("quantity", ""))
+            price = float(request.form.get("price", ""))
+        except (ValueError, TypeError):
+            return "Invalid quantity or price", 400
+
+        if not component_name or not category:
+            return "Component name and category are required", 400
+
+        if quantity < 0 or price < 0:
+            return "Quantity and price must not be negative", 400
 
         conn = get_db_connection()
 
-        conn.execute("""
-            INSERT INTO components
-            (component_name, category, quantity, price)
-            VALUES (?, ?, ?, ?)
-        """, (
-            component_name,
-            category,
-            quantity,
-            price
-        ))
-
-        conn.commit()
-        conn.close()
+        try:
+            conn.execute("""
+                INSERT INTO components
+                (component_name, category, quantity, price)
+                VALUES (?, ?, ?, ?)
+            """, (
+                component_name,
+                category,
+                quantity,
+                price
+            ))
+            conn.commit()
+        except sqlite3.Error:
+            conn.rollback()
+            return "Unable to save component", 500
+        finally:
+            conn.close()
 
         return redirect("/inventory")
 
@@ -126,7 +125,6 @@ def add_component():
 
 @app.route("/delete/<int:component_id>")
 def delete_component(component_id):
-
     conn = get_db_connection()
 
     conn.execute(
@@ -142,13 +140,8 @@ def delete_component(component_id):
 
 @app.route("/report")
 def report():
-
     conn = get_db_connection()
-
-    components = conn.execute(
-        "SELECT * FROM components"
-    ).fetchall()
-
+    components = conn.execute("SELECT * FROM components").fetchall()
     conn.close()
 
     available = []
@@ -156,15 +149,12 @@ def report():
     out_of_stock = []
 
     for component in components:
-
         status = get_status(component["quantity"])
 
         if status == "Available":
             available.append(component)
-
         elif status == "Low Stock":
             low_stock.append(component)
-
         else:
             out_of_stock.append(component)
 
