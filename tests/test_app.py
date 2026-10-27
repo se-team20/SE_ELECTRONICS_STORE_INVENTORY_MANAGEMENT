@@ -1,3 +1,4 @@
+
 import sys
 from pathlib import Path
 
@@ -105,3 +106,4 @@ def test_stock_status_counts():
     assert available == 2
     assert low_stock == 2
     assert out_of_stock == 2
+
