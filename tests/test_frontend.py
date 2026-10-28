@@ -3,6 +3,9 @@ import os
 import tempfile
 import unittest
 
+# Set a test-only secret before importing the Flask application.
+os.environ.setdefault("SECRET_KEY", "test-only-secret-key-for-ci")
+
 import app as inventory_app
 
 
@@ -12,33 +15,54 @@ class FrontendIntegrationTests(unittest.TestCase):
         os.close(handle)
 
         self.old_database = inventory_app.app.config["DATABASE"]
+        self.old_testing = inventory_app.app.config["TESTING"]
+
         inventory_app.app.config["DATABASE"] = self.db_path
         inventory_app.app.config["TESTING"] = True
 
         inventory_app.initialize_database()
+        inventory_app.create_user("testuser", "TestPassword123!")
+
         self.client = inventory_app.app.test_client()
+
+        # Log in before testing protected routes.
+        response = self.client.post(
+            "/login",
+            data={
+                "username": "testuser",
+                "password": "TestPassword123!",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
 
     def tearDown(self):
         inventory_app.app.config["DATABASE"] = self.old_database
         inventory_app.app.config["TESTING"] = self.old_testing
+
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
 
-    def add_sample_component(self, name="Arduino", category="Boards",
-                             quantity=15, price=20.0):
+    def add_sample_component(
+        self,
+        name="Arduino",
+        category="Boards",
+        quantity=15,
+        price=20.0,
+    ):
         conn = inventory_app.get_db_connection()
-        cursor = conn.execute(
-            """
-           INSERT INTO components
-           (sku, component_name, category, quantity, price)
-           VALUES (?, ?, ?, ?, ?)
-            """,
-            (f"TEST-{name.replace(' ', '-')}", name, category, quantity, price)
-        )
-        conn.commit()
-        component_id = cursor.lastrowid
-        conn.close()
-        return component_id
+        try:
+            cursor = conn.execute(
+                """
+                INSERT INTO components
+                    (component_name, category, quantity, price)
+                VALUES (?, ?, ?, ?)
+                """,
+                (name, category, quantity, price),
+            )
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            conn.close()
 
     def test_dashboard_renders(self):
         response = self.client.get("/")
@@ -61,32 +85,39 @@ class FrontendIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_valid_submission_adds_component(self):
-        response = self.client.post("/add", data={
-            "sku": "TEST-ARDUINO",
-            "component_name": "Arduino",
-            "category": "Boards",
-            "quantity": "15",
-            "price": "20.50",
-        })
+        response = self.client.post(
+            "/add",
+            data={
+                "component_name": "Arduino",
+                "category": "Boards",
+                "quantity": "15",
+                "price": "20.50",
+            },
+        )
         self.assertEqual(response.status_code, 302)
 
         conn = inventory_app.get_db_connection()
-        row = conn.execute(
-            "SELECT * FROM components WHERE component_name = ?",
-            ("Arduino",),
-        ).fetchone()
-        conn.close()
+        try:
+            row = conn.execute(
+                "SELECT * FROM components WHERE component_name = ?",
+                ("Arduino",),
+            ).fetchone()
+        finally:
+            conn.close()
 
         self.assertIsNotNone(row)
         self.assertEqual(row["quantity"], 15)
 
     def test_invalid_submission_returns_error(self):
-        response = self.client.post("/add", data={
-            "component_name": "",
-            "category": "",
-            "quantity": "-1",
-            "price": "invalid",
-        })
+        response = self.client.post(
+            "/add",
+            data={
+                "component_name": "",
+                "category": "",
+                "quantity": "-1",
+                "price": "invalid",
+            },
+        )
         self.assertEqual(response.status_code, 400)
         self.assertIn(b"Component name is required", response.data)
         self.assertIn(b"Price must be a valid number", response.data)
@@ -120,10 +151,10 @@ class FrontendIntegrationTests(unittest.TestCase):
 
     def test_edit_component(self):
         component_id = self.add_sample_component()
+
         response = self.client.post(
             f"/edit/{component_id}",
             data={
-                "sku": "TEST-ARDUINO-UPDATED",
                 "component_name": "Updated Arduino",
                 "category": "Boards",
                 "quantity": "20",
@@ -133,38 +164,68 @@ class FrontendIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
 
         conn = inventory_app.get_db_connection()
-        row = conn.execute(
-            "SELECT * FROM components WHERE component_id = ?",
-            (component_id,),
-        ).fetchone()
-        conn.close()
+        try:
+            row = conn.execute(
+                "SELECT * FROM components WHERE component_id = ?",
+                (component_id,),
+            ).fetchone()
+        finally:
+            conn.close()
 
         self.assertEqual(row["component_name"], "Updated Arduino")
         self.assertEqual(row["quantity"], 20)
 
     def test_missing_component_edit_redirects(self):
-        response = self.client.get("/edit/99999")
+        response = self.client.get("/edit/999999")
         self.assertEqual(response.status_code, 302)
 
     def test_delete_component(self):
         component_id = self.add_sample_component()
+
         response = self.client.post(f"/delete/{component_id}")
         self.assertEqual(response.status_code, 302)
 
         conn = inventory_app.get_db_connection()
-        row = conn.execute(
-            "SELECT * FROM components WHERE component_id = ?",
-            (component_id,),
-        ).fetchone()
-        conn.close()
+        try:
+            row = conn.execute(
+                "SELECT * FROM components WHERE component_id = ?",
+                (component_id,),
+            ).fetchone()
+        finally:
+            conn.close()
 
         self.assertIsNone(row)
 
     def test_delete_get_is_not_allowed(self):
-        response = self.client.get("/delete/1")
+        component_id = self.add_sample_component()
+        response = self.client.get(f"/delete/{component_id}")
         self.assertEqual(response.status_code, 405)
+
+    def test_login_page_renders(self):
+        self.client.post("/logout")
+        response = self.client.get("/login")
+        self.assertEqual(response.status_code, 200)
+
+    def test_invalid_login_is_rejected(self):
+        self.client.post("/logout")
+
+        response = self.client.post(
+            "/login",
+            data={
+                "username": "testuser",
+                "password": "WrongPassword123!",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Invalid username or password", response.data)
+
+    def test_logout_clears_session(self):
+        response = self.client.post("/logout")
+        self.assertEqual(response.status_code, 302)
+
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 302)
 
 
 if __name__ == "__main__":
     unittest.main()
-
