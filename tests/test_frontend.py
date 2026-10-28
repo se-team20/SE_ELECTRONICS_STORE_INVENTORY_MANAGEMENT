@@ -20,7 +20,7 @@ class FrontendIntegrationTests(unittest.TestCase):
 
     def tearDown(self):
         inventory_app.app.config["DATABASE"] = self.old_database
-        inventory_app.app.config["TESTING"] = False
+        inventory_app.app.config["TESTING"] = self.old_testing
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
 
