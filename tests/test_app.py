@@ -1,4 +1,5 @@
-﻿import sys
+﻿
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -193,6 +194,8 @@ def test_add_component_rejects_invalid_price(client):
     conn.close()
 
     assert count == 0
+
+
 def test_export_csv_contains_inventory_and_status(client):
     add_component(client, "Resistor 10K", quantity=100)
     add_component(client, "Arduino UNO", quantity=5)
