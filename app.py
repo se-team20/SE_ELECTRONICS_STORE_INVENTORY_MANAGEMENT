@@ -1,4 +1,6 @@
 
+import csv
+import io
 import math
 import os
 import sqlite3
@@ -6,10 +8,10 @@ from functools import wraps
 from urllib.parse import urlparse
 
 from flask import (
-    Flask, flash, redirect, render_template, request, session, url_for
+    Flask, flash, redirect, render_template, request, session, url_for,
+    Response
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-
 app = Flask(__name__)
 app.secret_key = os.environ.get(
     "SECRET_KEY", "dev-only-change-this-before-deployment"
@@ -526,6 +528,49 @@ def report():
         available=available,
         low_stock=low_stock,
         out_of_stock=out_of_stock,
+    )
+@app.route("/export/csv")
+@login_required
+def export_csv():
+    conn = get_db_connection()
+    try:
+        components = conn.execute(
+            "SELECT * FROM components ORDER BY component_id"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Component ID",
+        "Component Name",
+        "Quantity",
+        "Minimum Stock Level",
+        "Status",
+    ])
+
+    for component in components:
+        status = get_status(
+            component["quantity"],
+            component["min_stock_level"]
+        )
+        writer.writerow([
+            component["component_id"],
+            component["component_name"],
+            component["quantity"],
+            component["min_stock_level"],
+            status,
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition":
+                "attachment; filename=inventory_report.csv"
+        },
     )
 
 

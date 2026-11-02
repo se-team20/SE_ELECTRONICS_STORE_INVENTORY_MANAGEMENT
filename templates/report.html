@@ -1,1 +1,93 @@
 
+{% extends "base.html" %}
+
+{% block title %}Availability Report{% endblock %}
+
+{% block content %}
+<h2>Component Availability Report</h2>
+<p><a href="{{ url_for('export_csv') }}">Download Inventory Report (CSV)</a></p>
+
+<section class="report-section">
+    <h3>Available Components</h3>
+    {% if available %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Component ID</th>
+                    <th>Name</th>
+                    <th>Quantity</th>
+                    <th>Minimum Stock Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for component in available %}
+                <tr>
+                    <td>{{ component.component_id }}</td>
+                    <td>{{ component.component_name }}</td>
+                    <td>{{ component.quantity }}</td>
+                    <td>{{ component.min_stock_level }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No available components.</p>
+    {% endif %}
+</section>
+
+<section class="report-section">
+    <h3>Low Stock Components</h3>
+    {% if low_stock %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Component ID</th>
+                    <th>Name</th>
+                    <th>Quantity</th>
+                    <th>Minimum Stock Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for component in low_stock %}
+                <tr>
+                    <td>{{ component.component_id }}</td>
+                    <td>{{ component.component_name }}</td>
+                    <td>{{ component.quantity }}</td>
+                    <td>{{ component.min_stock_level }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No low stock components.</p>
+    {% endif %}
+</section>
+
+<section class="report-section">
+    <h3>Out of Stock Components</h3>
+    {% if out_of_stock %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Component ID</th>
+                    <th>Name</th>
+                    <th>Quantity</th>
+                    <th>Minimum Stock Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for component in out_of_stock %}
+                <tr>
+                    <td>{{ component.component_id }}</td>
+                    <td>{{ component.component_name }}</td>
+                    <td>{{ component.quantity }}</td>
+                    <td>{{ component.min_stock_level }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No out of stock components.</p>
+    {% endif %}
+</section>
+{% endblock %}
