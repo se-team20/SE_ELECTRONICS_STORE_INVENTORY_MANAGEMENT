@@ -1,9 +1,8 @@
-
 name: Tests
 
 on:
   push:
-    branches: ["main", "feature/secure-login-logout"]
+    branches: ["main", "feature/secure-login-logout", "fix/dhanush-commit-authors"]
   pull_request:
     branches: ["main"]
 

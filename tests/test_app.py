@@ -1,4 +1,5 @@
-﻿import sys
+﻿
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -193,3 +194,27 @@ def test_add_component_rejects_invalid_price(client):
     conn.close()
 
     assert count == 0
+
+
+def test_export_csv_contains_inventory_and_status(client):
+    add_component(client, "Resistor 10K", quantity=100)
+    add_component(client, "Arduino UNO", quantity=5)
+    add_component(client, "LED Red", quantity=0)
+
+    response = client.get("/export/csv")
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/csv"
+    assert "attachment; filename=inventory_report.csv" in (
+        response.headers["Content-Disposition"]
+    )
+
+    csv_content = response.get_data(as_text=True)
+
+    assert "Component ID,Component Name,Quantity,Minimum Stock Level,Status" in csv_content
+    assert "Resistor 10K" in csv_content
+    assert "Arduino UNO" in csv_content
+    assert "LED Red" in csv_content
+    assert "Available" in csv_content
+    assert "Low Stock" in csv_content
+    assert "Out of Stock" in csv_content
