@@ -1,1 +1,99 @@
+﻿{% extends "base.html" %}
 
+{% block title %}Availability Report | Electronics Inventory{% endblock %}
+
+{% block content %}
+<h2>Inventory Availability Report</h2>
+<p>Overview of components based on their current stock levels.</p>
+
+<h3>Available Components ({{ available|length }})</h3>
+{% if available %}
+<table>
+    <thead>
+        <tr>
+            <th>SKU</th>
+            <th>Component</th>
+            <th>Category</th>
+            <th>Quantity</th>
+            <th>Minimum Stock</th>
+            <th>Price</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in available %}
+        <tr>
+            <td>{{ item.sku }}</td>
+            <td>{{ item.component_name }}</td>
+            <td>{{ item.category }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.min_stock_level }}</td>
+            <td>{{ "%.2f"|format(item.price) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No available components.</p>
+{% endif %}
+
+<h3>Low Stock Components ({{ low_stock|length }})</h3>
+{% if low_stock %}
+<table>
+    <thead>
+        <tr>
+            <th>SKU</th>
+            <th>Component</th>
+            <th>Category</th>
+            <th>Quantity</th>
+            <th>Minimum Stock</th>
+            <th>Price</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in low_stock %}
+        <tr>
+            <td>{{ item.sku }}</td>
+            <td>{{ item.component_name }}</td>
+            <td>{{ item.category }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.min_stock_level }}</td>
+            <td>{{ "%.2f"|format(item.price) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No low-stock components.</p>
+{% endif %}
+
+<h3>Out of Stock Components ({{ out_of_stock|length }})</h3>
+{% if out_of_stock %}
+<table>
+    <thead>
+        <tr>
+            <th>SKU</th>
+            <th>Component</th>
+            <th>Category</th>
+            <th>Quantity</th>
+            <th>Minimum Stock</th>
+            <th>Price</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in out_of_stock %}
+        <tr>
+            <td>{{ item.sku }}</td>
+            <td>{{ item.component_name }}</td>
+            <td>{{ item.category }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.min_stock_level }}</td>
+            <td>{{ "%.2f"|format(item.price) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No out-of-stock components.</p>
+{% endif %}
+
+{% endblock %}
