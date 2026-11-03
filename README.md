@@ -45,8 +45,6 @@ python -m pip install Flask pytest
 python app.py
 ```
 
-The SQLite database is initialized automatically when the application starts.
-
 ### 4. Open the application
 
 Open the following URL in your browser:
@@ -61,14 +59,14 @@ Log in using an account configured for the application.
 
 The application uses an SQLite database named `database.db` by default.
 
-The database stores:
-- Component details
-- SKU information
-- Component quantities and prices
-- Minimum stock levels
-- User account information
+The database stores component details, SKU information, quantities, prices, minimum stock levels, and user account information.
 
-The application also supports environment variables for database configuration, the secret key, and the low-stock threshold.
+## Authentication and Security
+
+- User login and logout functionality.
+- Role-based access control, if configured in the application.
+- Protected inventory operations, if configured in the application.
+- Authentication and authorization tests, if included in the test suite.
 
 ## Automated Testing
 
@@ -78,19 +76,11 @@ Run the automated test suite from the project directory:
 python -m pytest -v
 ```
 
-The tests cover:
-- Component creation, updating, and deletion
-- Input validation
-- Duplicate SKU prevention
-- Stock-status boundaries
-- Dashboard calculations
-- Inventory reports
-- CSV export
-- Database integrity checks
+The tests cover inventory operations, input validation, stock status, database constraints, and other implemented functionality.
 
 ## Continuous Integration
 
-GitHub Actions is configured to install the required dependencies and execute automated tests when changes are pushed to supported branches or pull requests are created against the main branch.
+GitHub Actions is configured to run automated tests when changes are pushed to supported branches or pull requests are created against the main branch.
 
 ## Project Scope
 
