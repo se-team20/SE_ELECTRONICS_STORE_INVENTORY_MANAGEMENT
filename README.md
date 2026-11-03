@@ -46,16 +46,19 @@ A web-based system for managing electronic component inventory.
 
    `http://127.0.0.1:5000`
 
-## Testing
-
-Run the automated tests from the project directory:
-
-```bash
-py -m unittest discover -s tests -v
-```
-
 The tests cover inventory operations, input validation, stock status, and database constraints.
 
 ## Project Scope
 
 The system supports electronic component inventory management, including adding, updating, deleting, searching, availability checking, low-stock detection, and inventory reporting.
+## Authentication and Security
+
+- Secure user login and logout using password hashing.
+- Role-based access control for Administrators, Store Managers, and Inventory Staff.
+- Protected inventory modification routes.
+- Audit logging for inventory operations.
+- Automated authentication and authorization tests.
+
+## Testing
+
+Authentication, authorization, inventory backend, frontend, and audit logging tests are included in the project.
