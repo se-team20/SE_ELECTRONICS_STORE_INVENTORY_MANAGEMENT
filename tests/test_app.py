@@ -218,3 +218,40 @@ def test_export_csv_contains_inventory_and_status(client):
     assert "Available" in csv_content
     assert "Low Stock" in csv_content
     assert "Out of Stock" in csv_content
+def test_add_component_duplicate_sku_is_rejected(client):
+    add_component(client, "Keyboard", quantity=15)
+
+    response = client.post("/add", data={
+        "sku": "TEST-KEYBOARD",
+        "component_name": "Another Keyboard",
+        "category": "Accessories",
+        "quantity": "20",
+        "price": "999",
+        "min_stock_level": "10",
+    })
+
+    assert response.status_code == 400
+
+    conn = sqlite3.connect(inventory_app.app.config["DATABASE"])
+    count = conn.execute(
+        "SELECT COUNT(*) FROM components"
+    ).fetchone()[0]
+    conn.close()
+
+    assert count == 1
+
+
+def test_add_component_negative_quantity_is_rejected(client):
+    response = add_component(
+        client, "Invalid Keyboard", quantity=-5
+    )
+
+    assert response.status_code == 400
+
+    conn = sqlite3.connect(inventory_app.app.config["DATABASE"])
+    count = conn.execute(
+        "SELECT COUNT(*) FROM components"
+    ).fetchone()[0]
+    conn.close()
+
+    assert count == 0

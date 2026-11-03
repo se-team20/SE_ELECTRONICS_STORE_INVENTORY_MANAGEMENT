@@ -64,6 +64,15 @@ class FrontendIntegrationTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_protected_route_redirects_unauthenticated_user(self):
+        with self.client.session_transaction() as session:
+            session.clear()
+
+        response = self.client.get("/", follow_redirects=False)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.headers["Location"])
+
     def test_dashboard_renders(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
