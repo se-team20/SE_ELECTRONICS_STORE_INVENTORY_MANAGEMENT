@@ -18,7 +18,7 @@ class FrontendIntegrationTests(unittest.TestCase):
         inventory_app.app.config["TESTING"] = True
 
         inventory_app.initialize_database()
-        inventory_app.create_user("testuser", "TestPassword123!")
+        inventory_app.create_user("testuser","TestPassword123!",role="Store Manager")
 
         self.client = inventory_app.app.test_client()
 
@@ -84,6 +84,7 @@ class FrontendIntegrationTests(unittest.TestCase):
         response = self.client.post(
             "/add",
             data={
+                "sku": "TEST-ARDUINO-001",
                 "component_name": "Arduino",
                 "category": "Boards",
                 "quantity": "15",
@@ -149,6 +150,7 @@ class FrontendIntegrationTests(unittest.TestCase):
         response = self.client.post(
             f"/edit/{component_id}",
             data={
+                "sku": "UPDATED-ARDUINO-001",
                 "component_name": "Updated Arduino",
                 "category": "Boards",
                 "quantity": "20",
