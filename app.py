@@ -4,22 +4,44 @@ import math
 import os
 import sqlite3
 from functools import wraps
-from urllib.parse import urlparse
+from pathlib import Path
 
 from flask import (
-    Flask, flash, redirect, render_template, request, session, url_for,
-    Response
+    Flask,
+    Response,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
 )
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
+
+BASE_DIR = Path(__file__).resolve().parent
 
 app = Flask(__name__)
-app.secret_key = os.environ.get(
-    "SECRET_KEY", "dev-only-change-this-before-deployment"
+app.config["DATABASE"] = str(
+    Path(os.environ.get("DATABASE", BASE_DIR / "database.db")).resolve()
 )
-app.config["DATABASE"] = os.environ.get("DATABASE", "database.db")
 app.config["LOW_STOCK_THRESHOLD"] = int(
     os.environ.get("LOW_STOCK_THRESHOLD", "10")
 )
+
+_secret_key = os.environ.get("SECRET_KEY")
+if not _secret_key:
+    raise RuntimeError(
+        "Set the SECRET_KEY environment variable before starting the app."
+    )
+
+app.config["SECRET_KEY"] = _secret_key
+app.secret_key = _secret_key
+
+VALID_ROLES = {
+    "Administrator",
+    "Store Manager",
+    "Inventory Staff",
+}
 
 
 def get_db_connection():
@@ -30,9 +52,8 @@ def get_db_connection():
 
 
 def initialize_database():
-    """Create inventory and user tables and migrate older databases."""
+    """Create tables and migrate older databases safely."""
     conn = get_db_connection()
-
     try:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS components (
@@ -54,7 +75,6 @@ def initialize_database():
 
         if "sku" not in columns:
             conn.execute("ALTER TABLE components ADD COLUMN sku TEXT")
-
         if "min_stock_level" not in columns:
             conn.execute("""
                 ALTER TABLE components
@@ -83,7 +103,29 @@ def initialize_database():
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'Inventory Staff'
+            )
+        """)
+
+        user_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(users)")
+        }
+        if "role" not in user_columns:
+            conn.execute("""
+                ALTER TABLE users
+                ADD COLUMN role TEXT NOT NULL DEFAULT 'Inventory Staff'
+            """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                username TEXT NOT NULL,
+                action TEXT NOT NULL,
+                component_id INTEGER,
+                timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
@@ -92,27 +134,26 @@ def initialize_database():
         conn.close()
 
 
-def create_user(username, password):
-    """Create a user with a securely hashed password."""
+def create_user(username, password, role="Inventory Staff"):
+    """Create a user with a hashed password and validated role."""
     username = (username or "").strip()
 
-    if not username:
-        raise ValueError("Username is required.")
-
-    if len(username) > 100:
-        raise ValueError("Username must be 100 characters or fewer.")
-
+    if not username or len(username) > 100:
+        raise ValueError("Username must contain 1–100 characters.")
     if not password or len(password) < 12:
-        raise ValueError("Password must contain at least 12 characters.")
+        raise ValueError("Password must be at least 12 characters.")
+    if role not in VALID_ROLES:
+        raise ValueError("Invalid role.")
 
     initialize_database()
-    password_hash = generate_password_hash(password)
     conn = get_db_connection()
-
     try:
         conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            """
+            INSERT INTO users (username, password_hash, role)
+            VALUES (?, ?, ?)
+            """,
+            (username, generate_password_hash(password), role),
         )
         conn.commit()
     finally:
@@ -120,17 +161,52 @@ def create_user(username, password):
 
 
 def login_required(view):
-    """Restrict a view to authenticated users."""
-
+    """Require the user to be logged in."""
     @wraps(view)
     def wrapped_view(*args, **kwargs):
         if "user_id" not in session:
-            flash("Please log in to continue.", "error")
-            return redirect(url_for("login", next=request.url))
-
+            return redirect(url_for("login", next=request.path))
         return view(*args, **kwargs)
 
     return wrapped_view
+
+
+def role_required(*allowed_roles):
+    """Require authentication and one of the specified roles."""
+    def decorator(view):
+        @wraps(view)
+        @login_required
+        def wrapped_view(*args, **kwargs):
+            if session.get("role") not in allowed_roles:
+                return "Forbidden: insufficient permissions", 403
+            return view(*args, **kwargs)
+
+        return wrapped_view
+
+    return decorator
+
+
+def log_action(action, component_id=None):
+    """Record an authenticated user's inventory action."""
+    user_id = session.get("user_id")
+    username = session.get("username")
+
+    if user_id is None or not username:
+        raise RuntimeError("An authenticated user is required.")
+
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            """
+            INSERT INTO audit_logs
+                (user_id, username, action, component_id)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, username, action, component_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_status(quantity, min_stock_level=None):
@@ -167,47 +243,37 @@ def validate_component(form, current_component_id=None):
 
     if len(sku) > 64:
         errors.append("SKU must be 64 characters or fewer.")
-
     if not name:
         errors.append("Component name is required.")
-
     if not category:
         errors.append("Category is required.")
 
-    quantity = None
     try:
         if not quantity_text or str(int(quantity_text)) != quantity_text:
             raise ValueError
-
         quantity = int(quantity_text)
-
         if quantity < 0:
             errors.append("Quantity cannot be negative.")
     except (ValueError, TypeError):
-        errors.append("Quantity must be a whole number.")
+        quantity = None
+        errors.append("Quantity must be a non-negative whole number.")
 
-    price = None
     try:
         price = float(price_text)
-
         if not math.isfinite(price) or price < 0:
-            errors.append("Price must be a finite, non-negative number.")
-    except (ValueError, TypeError):
-        errors.append("Price must be a valid number.")
-
-    min_stock_level = None
-    try:
-        if (
-            not min_stock_text
-            or str(int(min_stock_text)) != min_stock_text
-        ):
             raise ValueError
-
-        min_stock_level = int(min_stock_text)
-
-        if min_stock_level < 0:
-            errors.append("Minimum stock level cannot be negative.")
     except (ValueError, TypeError):
+        price = None
+        errors.append("Price must be a finite, non-negative number.")
+
+    try:
+        if not min_stock_text or str(int(min_stock_text)) != min_stock_text:
+            raise ValueError
+        min_stock_level = int(min_stock_text)
+        if min_stock_level < 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        min_stock_level = None
         errors.append(
             "Minimum stock level must be a non-negative whole number."
         )
@@ -230,7 +296,7 @@ def validate_component(form, current_component_id=None):
             conn.close()
 
         if duplicate:
-            errors.append("SKU already exists. Please use a unique SKU.")
+            errors.append("SKU already exists. Use a unique SKU.")
 
     if errors:
         return None, errors
@@ -247,6 +313,11 @@ def validate_component(form, current_component_id=None):
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if "user_id" in session:
+        return redirect(url_for("dashboard"))
+
+    error = None
+
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
@@ -264,32 +335,24 @@ def login():
             session.clear()
             session["user_id"] = user["user_id"]
             session["username"] = user["username"]
+            session["role"] = user["role"]
+            session.permanent = True
 
-            next_url = request.args.get("next", "")
-            parsed_url = urlparse(next_url)
-
-            # Prevent redirects to external websites.
-            if (
-                next_url
-                and not parsed_url.scheme
-                and not parsed_url.netloc
-                and next_url.startswith("/")
-                and not next_url.startswith("//")
-            ):
-                return redirect(next_url)
+            destination = request.args.get("next", "")
+            if destination.startswith("/") and not destination.startswith("//"):
+                return redirect(destination)
 
             return redirect(url_for("dashboard"))
 
-        flash("Invalid username or password.", "error")
+        error = "Invalid username or password."
 
-    return render_template("login.html")
+    return render_template("login.html", error=error)
 
 
 @app.route("/logout", methods=["POST"])
 @login_required
 def logout():
     session.clear()
-    flash("You have been logged out.", "success")
     return redirect(url_for("login"))
 
 
@@ -334,36 +397,26 @@ def inventory():
         conn.close()
 
     filtered = []
-
     for component in components:
         searchable_text = (
-            (component["component_name"] or "")
-            + " "
-            + (component["sku"] or "")
-        )
+            f"{component['component_name']} {component['sku'] or ''}"
+        ).casefold()
 
-        if search and search.casefold() not in searchable_text.casefold():
+        if search and search.casefold() not in searchable_text:
             continue
-
         if category and component["category"] != category:
             continue
-
-        if (
-            status
-            and get_status(
-                component["quantity"], component["min_stock_level"]
-            ) != status
-        ):
+        if status and get_status(
+            component["quantity"], component["min_stock_level"]
+        ) != status:
             continue
 
         filtered.append(component)
 
-    categories = sorted({c["category"] for c in components})
-
     return render_template(
         "inventory.html",
         components=filtered,
-        categories=categories,
+        categories=sorted({c["category"] for c in components}),
         search=search,
         selected_category=category,
         selected_status=status,
@@ -372,7 +425,7 @@ def inventory():
 
 
 @app.route("/add", methods=["GET", "POST"])
-@login_required
+@role_required("Administrator", "Store Manager")
 def add_component():
     if request.method == "POST":
         data, errors = validate_component(request.form)
@@ -384,27 +437,32 @@ def add_component():
 
         conn = get_db_connection()
         try:
-            conn.execute("""
+            cursor = conn.execute(
+                """
                 INSERT INTO components
-                (sku, component_name, category, quantity, price,
-                 min_stock_level)
+                    (sku, component_name, category, quantity, price,
+                     min_stock_level)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                data["sku"],
-                data["component_name"],
-                data["category"],
-                data["quantity"],
-                data["price"],
-                data["min_stock_level"],
-            ))
+                """,
+                (
+                    data["sku"],
+                    data["component_name"],
+                    data["category"],
+                    data["quantity"],
+                    data["price"],
+                    data["min_stock_level"],
+                ),
+            )
+            component_id = cursor.lastrowid
             conn.commit()
         except sqlite3.IntegrityError:
             conn.rollback()
-            flash("SKU already exists. Please use a unique SKU.", "error")
+            flash("SKU already exists. Use a unique SKU.", "error")
             return render_template("add_component.html"), 400
         finally:
             conn.close()
 
+        log_action("ADD_COMPONENT", component_id)
         flash("Component added successfully.", "success")
         return redirect(url_for("inventory"))
 
@@ -412,7 +470,7 @@ def add_component():
 
 
 @app.route("/edit/<int:component_id>", methods=["GET", "POST"])
-@login_required
+@role_required("Administrator", "Store Manager")
 def edit_component(component_id):
     conn = get_db_connection()
     try:
@@ -437,7 +495,8 @@ def edit_component(component_id):
             for error in errors:
                 flash(error, "error")
             return render_template(
-                "edit_component.html", component=component
+                "edit_component.html",
+                component=component,
             ), 400
 
         conn = get_db_connection()
@@ -459,13 +518,15 @@ def edit_component(component_id):
             conn.commit()
         except sqlite3.IntegrityError:
             conn.rollback()
-            flash("SKU already exists. Please use a unique SKU.", "error")
+            flash("SKU already exists. Use a unique SKU.", "error")
             return render_template(
-                "edit_component.html", component=component
+                "edit_component.html",
+                component=component,
             ), 400
         finally:
             conn.close()
 
+        log_action("EDIT_COMPONENT", component_id)
         flash("Component updated successfully.", "success")
         return redirect(url_for("inventory"))
 
@@ -475,7 +536,7 @@ def edit_component(component_id):
 
 
 @app.route("/delete/<int:component_id>", methods=["POST"])
-@login_required
+@role_required("Administrator", "Store Manager")
 def delete_component(component_id):
     conn = get_db_connection()
     try:
@@ -489,6 +550,7 @@ def delete_component(component_id):
         conn.close()
 
     if deleted:
+        log_action("DELETE_COMPONENT", component_id)
         flash("Component deleted successfully.", "success")
     else:
         flash("Component not found.", "error")
@@ -513,9 +575,9 @@ def report():
 
     for component in components:
         status = get_status(
-            component["quantity"], component["min_stock_level"]
+            component["quantity"],
+            component["min_stock_level"],
         )
-
         if status == "Available":
             available.append(component)
         elif status == "Low Stock":
@@ -576,12 +638,20 @@ def export_csv():
 
 @app.cli.command("create-user")
 def create_user_command():
-    """Create a user using NEW_USERNAME and NEW_PASSWORD environment variables."""
-    username = os.environ.get("NEW_USERNAME", "")
-    password = os.environ.get("NEW_PASSWORD", "")
+    """Create a user using environment-provided credentials."""
+    username = os.environ.get("NEW_USERNAME")
+    password = os.environ.get("NEW_PASSWORD")
+    role = os.environ.get("NEW_ROLE", "Inventory Staff")
+
+    if not username or not password:
+        raise SystemExit(
+            "Set NEW_USERNAME and NEW_PASSWORD before running this command."
+        )
+
+    initialize_database()
 
     try:
-        create_user(username, password)
+        create_user(username, password, role)
     except (ValueError, sqlite3.IntegrityError) as exc:
         raise SystemExit(f"Could not create user: {exc}") from exc
 

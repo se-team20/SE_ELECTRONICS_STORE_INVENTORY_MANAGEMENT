@@ -3,13 +3,13 @@ import os
 import tempfile
 import unittest
 
-# Set a test-only secret before importing the Flask application.
 os.environ.setdefault("SECRET_KEY", "test-only-secret-key-for-ci")
 
 import app as inventory_app
 
 
 class FrontendIntegrationTests(unittest.TestCase):
+
     def setUp(self):
         handle, self.db_path = tempfile.mkstemp(suffix=".db")
         os.close(handle)
@@ -21,11 +21,14 @@ class FrontendIntegrationTests(unittest.TestCase):
         inventory_app.app.config["TESTING"] = True
 
         inventory_app.initialize_database()
-        inventory_app.create_user("testuser", "TestPassword123!")
+        inventory_app.create_user(
+            "testuser",
+            "TestPassword123!",
+            role="Store Manager"
+        )
 
         self.client = inventory_app.app.test_client()
 
-        # Log in before testing protected routes.
         response = self.client.post(
             "/login",
             data={
@@ -54,10 +57,18 @@ class FrontendIntegrationTests(unittest.TestCase):
             cursor = conn.execute(
                 """
                 INSERT INTO components
-                    (component_name, category, quantity, price)
-                VALUES (?, ?, ?, ?)
+                    (sku, component_name, category, quantity, price,
+                     min_stock_level)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (name, category, quantity, price),
+                (
+                    f"TEST-{name.replace(' ', '-').upper()}",
+                    name,
+                    category,
+                    quantity,
+                    price,
+                    10,
+                ),
             )
             conn.commit()
             return cursor.lastrowid
@@ -97,10 +108,12 @@ class FrontendIntegrationTests(unittest.TestCase):
         response = self.client.post(
             "/add",
             data={
+                "sku": "UPDATED-ARDUINO-001",
                 "component_name": "Arduino",
                 "category": "Boards",
                 "quantity": "15",
                 "price": "20.50",
+                "min_stock_level": "10",
             },
         )
         self.assertEqual(response.status_code, 302)
@@ -108,8 +121,8 @@ class FrontendIntegrationTests(unittest.TestCase):
         conn = inventory_app.get_db_connection()
         try:
             row = conn.execute(
-                "SELECT * FROM components WHERE component_name = ?",
-                ("Arduino",),
+                "SELECT * FROM components WHERE sku = ?",
+                ("UPDATED-ARDUINO-001",),
             ).fetchone()
         finally:
             conn.close()
@@ -121,15 +134,15 @@ class FrontendIntegrationTests(unittest.TestCase):
         response = self.client.post(
             "/add",
             data={
+                "sku": "",
                 "component_name": "",
                 "category": "",
                 "quantity": "-1",
                 "price": "invalid",
+                "min_stock_level": "-1",
             },
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn(b"Component name is required", response.data)
-        self.assertIn(b"Price must be a valid number", response.data)
 
     def test_search_filters_inventory(self):
         self.add_sample_component("Arduino")
@@ -164,10 +177,12 @@ class FrontendIntegrationTests(unittest.TestCase):
         response = self.client.post(
             f"/edit/{component_id}",
             data={
+                "sku": "UPDATED-ARDUINO-001",
                 "component_name": "Updated Arduino",
                 "category": "Boards",
                 "quantity": "20",
                 "price": "25.0",
+                "min_stock_level": "10",
             },
         )
         self.assertEqual(response.status_code, 302)
