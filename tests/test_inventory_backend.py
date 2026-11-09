@@ -1,3 +1,99 @@
+import os
+import tempfile
+import unittest
+
+import app as inventory_app
+
+
+class InventoryBackendTests(unittest.TestCase):
+
+    def setUp(self):
+        handle, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(handle)
+
+        self.old_database = inventory_app.app.config["DATABASE"]
+        self.old_threshold = inventory_app.app.config["LOW_STOCK_THRESHOLD"]
+        self.old_testing = inventory_app.app.config.get("TESTING", False)
+
+        inventory_app.app.config["DATABASE"] = self.db_path
+        inventory_app.app.config["LOW_STOCK_THRESHOLD"] = 5
+        inventory_app.app.config["TESTING"] = True
+
+        inventory_app.initialize_database()
+
+        self.client = inventory_app.app.test_client()
+
+        inventory_app.create_user(
+            "backend_test_user",
+            "TestPassword123!",
+            role="Store Manager",
+        )
+
+        self.client.post(
+            "/login",
+            data={
+                "username": "backend_test_user",
+                "password": "TestPassword123!",
+            },
+        )
+
+    def tearDown(self):
+        inventory_app.app.config["DATABASE"] = self.old_database
+        inventory_app.app.config["LOW_STOCK_THRESHOLD"] = self.old_threshold
+        inventory_app.app.config["TESTING"] = self.old_testing
+
+        if os.path.exists(self.db_path):
+            try:
+                os.remove(self.db_path)
+            except PermissionError:
+                import gc
+                gc.collect()
+                try:
+                    os.remove(self.db_path)
+                except PermissionError:
+                    pass
+
+    def payload(self, **overrides):
+        data = {
+            "sku": "CAP-001",
+            "component_name": "Capacitor",
+            "category": "Passive",
+            "quantity": "20",
+            "price": "2.50",
+            "min_stock_level": "5",
+        }
+        data.update(overrides)
+        return data
+
+    def get_component(self, sku):
+        conn = inventory_app.get_db_connection()
+        try:
+            return conn.execute(
+                "SELECT * FROM components WHERE sku = ?",
+                (sku,),
+            ).fetchone()
+        finally:
+            conn.close()
+
+    def test_create_component_persists_all_fields(self):
+        response = self.client.post("/add", data=self.payload())
+
+        self.assertEqual(response.status_code, 302)
+
+        row = self.get_component("CAP-001")
+        self.assertIsNotNone(row)
+        self.assertEqual(row["quantity"], 20)
+        self.assertEqual(row["min_stock_level"], 5)
+
+    def test_duplicate_sku_is_rejected_case_insensitively(self):
+        self.client.post("/add", data=self.payload())
+
+        response = self.client.post(
+            "/add",
+            data=self.payload(sku="cap-001", component_name="Other"),
+        )
+
+        self.assertEqual(response.status_code, 400)
         self.assertIn(b"SKU already exists", response.data)
 
     def test_negative_quantity_is_rejected(self):
