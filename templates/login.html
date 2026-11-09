@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Login - Electronics Store</title>
+
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -15,6 +16,7 @@
             min-height: 100vh;
             margin: 0;
         }
+
         .login-box {
             background: white;
             padding: 32px;
@@ -22,14 +24,23 @@
             width: 320px;
             box-shadow: 0 4px 16px #00000015;
         }
-        h2 { text-align: center; }
-        label { display: block; margin-top: 16px; }
+
+        h2 {
+            text-align: center;
+        }
+
+        label {
+            display: block;
+            margin-top: 16px;
+        }
+
         input {
             box-sizing: border-box;
             width: 100%;
             padding: 11px;
             margin-top: 6px;
         }
+
         button {
             width: 100%;
             padding: 12px;
@@ -40,27 +51,50 @@
             border-radius: 5px;
             cursor: pointer;
         }
-        .error { color: #c62828; }
+
+        .error {
+            color: #c62828;
+        }
+
+        .success {
+            color: #2e7d32;
+        }
     </style>
 </head>
+
 <body>
     <div class="login-box">
         <h2>Inventory Management</h2>
         <p>Log in to continue</p>
 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <p class="{{ category }}">{{ message }}</p>
+            {% endfor %}
+        {% endwith %}
+
         {% if error %}
             <p class="error">{{ error }}</p>
         {% endif %}
 
-        <form method="POST">
+        <form method="POST" action="{{ url_for('login') }}">
             <label for="username">Username</label>
-            <input id="username" name="username"
-                   type="text" required autocomplete="username">
+            <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                autocomplete="username"
+            >
 
             <label for="password">Password</label>
-            <input id="password" name="password"
-                   type="password" required
-                   autocomplete="current-password">
+            <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autocomplete="current-password"
+            >
 
             <button type="submit">Log In</button>
         </form>

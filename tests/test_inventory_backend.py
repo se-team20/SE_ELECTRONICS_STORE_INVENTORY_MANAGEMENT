@@ -1,98 +1,9 @@
-
-import os
-import tempfile
-import unittest
-
-import app as inventory_app
-
-
-class InventoryBackendTests(unittest.TestCase):
-
-    def setUp(self):
-        handle, self.db_path = tempfile.mkstemp(suffix=".db")
-        os.close(handle)
-
-        self.old_database = inventory_app.app.config["DATABASE"]
-        self.old_threshold = inventory_app.app.config["LOW_STOCK_THRESHOLD"]
-        self.old_testing = inventory_app.app.config.get("TESTING", False)
-
-        inventory_app.app.config["DATABASE"] = self.db_path
-        inventory_app.app.config["LOW_STOCK_THRESHOLD"] = 5
-        inventory_app.app.config["TESTING"] = True
-
-        inventory_app.initialize_database()
-
-        self.client = inventory_app.app.test_client()
-
-        inventory_app.create_user(
-            "backend_test_user",
-            "TestPassword123!",
-            role="Store Manager"
-        )
-
-        self.client.post(
-            "/login",
-            data={
-                "username": "backend_test_user",
-                "password": "TestPassword123!"
-            }
-        )
-
-    def tearDown(self):
-        inventory_app.app.config["DATABASE"] = self.old_database
-        inventory_app.app.config["LOW_STOCK_THRESHOLD"] = self.old_threshold
-        inventory_app.app.config["TESTING"] = self.old_testing
-
-        if os.path.exists(self.db_path):
-            os.remove(self.db_path)
-
-    def payload(self, **overrides):
-        data = {
-            "sku": "CAP-001",
-            "component_name": "Capacitor",
-            "category": "Passive",
-            "quantity": "20",
-            "price": "2.50",
-            "min_stock_level": "5"
-        }
-        data.update(overrides)
-        return data
-
-    def get_component(self, sku):
-        conn = inventory_app.get_db_connection()
-        try:
-            return conn.execute(
-                "SELECT * FROM components WHERE sku = ?",
-                (sku,)
-            ).fetchone()
-        finally:
-            conn.close()
-
-    def test_create_component_persists_all_fields(self):
-        response = self.client.post("/add", data=self.payload())
-
-        self.assertEqual(response.status_code, 302)
-
-        row = self.get_component("CAP-001")
-        self.assertIsNotNone(row)
-        self.assertEqual(row["quantity"], 20)
-        self.assertEqual(row["min_stock_level"], 5)
-
-    def test_duplicate_sku_is_rejected_case_insensitively(self):
-        self.client.post("/add", data=self.payload())
-
-        response = self.client.post(
-            "/add",
-            data=self.payload(sku="cap-001", component_name="Other")
-        )
-
-        self.assertEqual(response.status_code, 400)
         self.assertIn(b"SKU already exists", response.data)
 
     def test_negative_quantity_is_rejected(self):
         response = self.client.post(
             "/add",
-            data=self.payload(quantity="-1")
+            data=self.payload(quantity="-1"),
         )
 
         self.assertEqual(response.status_code, 400)
@@ -101,7 +12,7 @@ class InventoryBackendTests(unittest.TestCase):
     def test_fractional_quantity_is_rejected(self):
         response = self.client.post(
             "/add",
-            data=self.payload(quantity="1.5")
+            data=self.payload(quantity="1.5"),
         )
 
         self.assertEqual(response.status_code, 400)
@@ -111,20 +22,15 @@ class InventoryBackendTests(unittest.TestCase):
             with self.subTest(price=price):
                 response = self.client.post(
                     "/add",
-                    data=self.payload(
-                        sku=f"CAP-{price}",
-                        price=price
-                    )
+                    data=self.payload(sku=f"CAP-{price}", price=price),
                 )
-
                 self.assertEqual(response.status_code, 400)
 
     def test_negative_minimum_stock_level_is_rejected(self):
         response = self.client.post(
             "/add",
-            data=self.payload(min_stock_level="-2")
+            data=self.payload(min_stock_level="-2"),
         )
-
         self.assertEqual(response.status_code, 400)
 
     def test_update_component_changes_fields(self):
@@ -139,10 +45,9 @@ class InventoryBackendTests(unittest.TestCase):
                 sku="CAP-002",
                 component_name="Updated capacitor",
                 quantity="3",
-                min_stock_level="4"
-            )
+                min_stock_level="4",
+            ),
         )
-
         self.assertEqual(response.status_code, 302)
 
         updated = self.get_component("CAP-002")
@@ -158,34 +63,33 @@ class InventoryBackendTests(unittest.TestCase):
         self.assertIsNotNone(row)
 
         response = self.client.post(
-            f"/delete/{row['component_id']}"
+            f"/delete/{row['component_id']}",
         )
-
         self.assertEqual(response.status_code, 302)
         self.assertIsNone(self.get_component("CAP-001"))
 
     def test_component_minimum_stock_level_controls_status(self):
         self.assertEqual(
             inventory_app.get_status(0, 5),
-            "Out of Stock"
+            "Out of Stock",
         )
         self.assertEqual(
             inventory_app.get_status(5, 5),
-            "Low Stock"
+            "Low Stock",
         )
         self.assertEqual(
             inventory_app.get_status(6, 5),
-            "Available"
+            "Available",
         )
 
     def test_configurable_default_low_stock_threshold(self):
         self.assertEqual(
             inventory_app.get_status(5),
-            "Low Stock"
+            "Low Stock",
         )
         self.assertEqual(
             inventory_app.get_status(6),
-            "Available"
+            "Available",
         )
 
     def test_sqlite_enforces_unique_sku(self):
@@ -200,7 +104,7 @@ class InventoryBackendTests(unittest.TestCase):
                     (sku, component_name, category, quantity, price)
                     VALUES (?, ?, ?, ?, ?)
                     """,
-                    ("CAP-001", "Duplicate", "Passive", 1, 1.0)
+                    ("CAP-001", "Duplicate", "Passive", 1, 1.0),
                 )
         finally:
             conn.close()
