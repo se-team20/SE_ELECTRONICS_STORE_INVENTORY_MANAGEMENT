@@ -77,7 +77,7 @@
             <p class="error">{{ error }}</p>
         {% endif %}
 
-        <form method="POST" action="{{ url_for('login') }}">
+        <form method="POST" action="{{ url_for('login', next=request.args.get('next')) }}">
             <label for="username">Username</label>
             <input
                 id="username"
