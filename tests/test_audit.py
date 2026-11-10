@@ -6,9 +6,36 @@ import unittest
 os.environ.setdefault("SECRET_KEY", "test-only-secret-key-for-ci")
 
 import app as inventory_app
+from unittest.mock import patch
 
 
 class AuditLoggingTests(unittest.TestCase):
+
+    def test_add_component_rolls_back_when_audit_logging_fails(self):
+        with patch.object(
+            inventory_app,
+            "log_action",
+            side_effect=RuntimeError("Simulated audit failure"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.add_component()
+
+        conn = inventory_app.get_db_connection()
+        try:
+            component = conn.execute(
+                "SELECT * FROM components WHERE sku = ?",
+                ("AUDIT-001",),
+            ).fetchone()
+
+            logs = conn.execute(
+                "SELECT * FROM audit_logs"
+            ).fetchall()
+        finally:
+            conn.close()
+
+        self.assertIsNone(component)
+        self.assertEqual(len(logs), 0)
+
 
     def setUp(self):
         handle, self.db_path = tempfile.mkstemp(suffix=".db")

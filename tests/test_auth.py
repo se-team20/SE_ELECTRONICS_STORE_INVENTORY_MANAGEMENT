@@ -129,6 +129,41 @@ class AuthenticationTests(unittest.TestCase):
         with self.assertRaises(Exception):
             inventory_app.create_user("testuser", "AnotherPassword123!")
 
+    def test_inventory_staff_cannot_add_component(self):
+            self.login()
+            response = self.client.get("/add")
+            self.assertEqual(response.status_code, 403)
+    
+    def test_inventory_staff_cannot_edit_component(self):
+            self.login()
+            response = self.client.get("/edit/1")
+            self.assertEqual(response.status_code, 403)
+    
+    def test_inventory_staff_cannot_delete_component(self):
+            self.login()
+            response = self.client.post("/delete/1")
+            self.assertEqual(response.status_code, 403)
+    
+    def test_store_manager_can_access_add_page(self):
+            inventory_app.create_user(
+                "manager",
+                "ManagerPassword123!",
+                role="Store Manager"
+            )
+            self.login("manager", "ManagerPassword123!")
+            response = self.client.get("/add")
+            self.assertEqual(response.status_code, 200)
+    
+    def test_administrator_can_access_add_page(self):
+            inventory_app.create_user(
+                "admin",
+                "AdminPassword123!",
+                role="Administrator"
+            )
+            self.login("admin", "AdminPassword123!")
+            response = self.client.get("/add")
+            self.assertEqual(response.status_code, 200)
+            
 
 if __name__ == "__main__":
-    unittest.main()
+     unittest.main()
