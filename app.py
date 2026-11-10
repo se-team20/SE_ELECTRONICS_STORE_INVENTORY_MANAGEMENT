@@ -186,7 +186,8 @@ def role_required(*allowed_roles):
     return decorator
 
 
-def log_action(action, component_id=None):
+
+def log_action(action, component_id=None, conn=None):
     """Record an authenticated user's inventory action."""
     user_id = session.get("user_id")
     username = session.get("username")
@@ -194,19 +195,18 @@ def log_action(action, component_id=None):
     if user_id is None or not username:
         raise RuntimeError("An authenticated user is required.")
 
-    conn = get_db_connection()
-    try:
-        conn.execute(
-            """
-            INSERT INTO audit_logs
-                (user_id, username, action, component_id)
-            VALUES (?, ?, ?, ?)
-            """,
-            (user_id, username, action, component_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    if conn is None:
+        raise ValueError("A database connection is required.")
+
+    conn.execute(
+        """
+        INSERT INTO audit_logs
+            (user_id, username, action, component_id)
+        VALUES (?, ?, ?, ?)
+        """,
+        (user_id, username, action, component_id),
+    )
+
 
 
 def get_status(quantity, min_stock_level=None):
@@ -454,15 +454,20 @@ def add_component():
                 ),
             )
             component_id = cursor.lastrowid
+
+            log_action("ADD_COMPONENT", component_id, conn)
             conn.commit()
         except sqlite3.IntegrityError:
             conn.rollback()
             flash("SKU already exists. Use a unique SKU.", "error")
             return render_template("add_component.html"), 400
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
-        log_action("ADD_COMPONENT", component_id)
+        
         flash("Component added successfully.", "success")
         return redirect(url_for("inventory"))
 
@@ -478,6 +483,9 @@ def edit_component(component_id):
             "SELECT * FROM components WHERE component_id = ?",
             (component_id,),
         ).fetchone()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -515,6 +523,7 @@ def edit_component(component_id):
                 data["min_stock_level"],
                 component_id,
             ))
+            log_action("EDIT_COMPONENT", component_id, conn)
             conn.commit()
         except sqlite3.IntegrityError:
             conn.rollback()
@@ -523,10 +532,13 @@ def edit_component(component_id):
                 "edit_component.html",
                 component=component,
             ), 400
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
-        log_action("EDIT_COMPONENT", component_id)
+        
         flash("Component updated successfully.", "success")
         return redirect(url_for("inventory"))
 
@@ -544,13 +556,22 @@ def delete_component(component_id):
             "DELETE FROM components WHERE component_id = ?",
             (component_id,),
         )
-        conn.commit()
+
         deleted = cursor.rowcount
+
+        if deleted:
+            log_action("DELETE_COMPONENT", component_id, conn)
+
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
     finally:
         conn.close()
 
     if deleted:
-        log_action("DELETE_COMPONENT", component_id)
         flash("Component deleted successfully.", "success")
     else:
         flash("Component not found.", "error")
