@@ -1,43 +1,64 @@
-﻿
 import sys
+import sqlite3
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-import sqlite3
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import app as inventory_app
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    """Create an isolated test database for each test."""
+    """Create an isolated database and authenticate as a Store Manager."""
     test_db = tmp_path / "test_inventory.db"
 
     monkeypatch.setitem(
         inventory_app.app.config, "DATABASE", str(test_db)
     )
-    inventory_app.app.config["TESTING"] = True
+    monkeypatch.setitem(inventory_app.app.config, "TESTING", True)
+
     inventory_app.initialize_database()
 
+    # Create a real user with the permissions required by add/edit/delete.
+    inventory_app.create_user(
+        "test_store_manager",
+        "TestPassword123!",
+        role="Store Manager",
+    )
+
     with inventory_app.app.test_client() as test_client:
-        with test_client.session_transaction() as session:
-            session["_user_id"] = "1"
-            session["user_id"] = 1
+        response = test_client.post(
+            "/login",
+            data={
+                "username": "test_store_manager",
+                "password": "TestPassword123!",
+            },
+        )
+        assert response.status_code in (302, 303)
         yield test_client
 
 
-def add_component(client, name="Keyboard", category="Accessories",
-                  quantity=15, price=799.0):
-    return client.post("/add", data={
-        "sku": f"TEST-{name.replace(' ', '-').upper()}",
-        "component_name": name,
-        "category": category,
-        "quantity": str(quantity),
-        "price": str(price),
-        "min_stock_level": "10",
-    }, follow_redirects=False)
+def add_component(
+    client,
+    name="Keyboard",
+    category="Accessories",
+    quantity=15,
+    price=799.0,
+):
+    return client.post(
+        "/add",
+        data={
+            "sku": f"TEST-{name.replace(' ', '-').upper()}",
+            "component_name": name,
+            "category": category,
+            "quantity": str(quantity),
+            "price": str(price),
+            "min_stock_level": "10",
+        },
+        follow_redirects=False,
+    )
 
 
 def test_stock_status_boundaries():
@@ -61,7 +82,8 @@ def test_add_component_saves_to_database(client):
 
 
 def test_delete_component(client):
-    add_component(client, "Keyboard", quantity=15)
+    response = add_component(client, "Keyboard", quantity=15)
+    assert response.status_code == 302
 
     conn = sqlite3.connect(inventory_app.app.config["DATABASE"])
     component_id = conn.execute(
@@ -218,17 +240,22 @@ def test_export_csv_contains_inventory_and_status(client):
     assert "Available" in csv_content
     assert "Low Stock" in csv_content
     assert "Out of Stock" in csv_content
+
+
 def test_add_component_duplicate_sku_is_rejected(client):
     add_component(client, "Keyboard", quantity=15)
 
-    response = client.post("/add", data={
-        "sku": "TEST-KEYBOARD",
-        "component_name": "Another Keyboard",
-        "category": "Accessories",
-        "quantity": "20",
-        "price": "999",
-        "min_stock_level": "10",
-    })
+    response = client.post(
+        "/add",
+        data={
+            "sku": "TEST-KEYBOARD",
+            "component_name": "Another Keyboard",
+            "category": "Accessories",
+            "quantity": "20",
+            "price": "999",
+            "min_stock_level": "10",
+        },
+    )
 
     assert response.status_code == 400
 
